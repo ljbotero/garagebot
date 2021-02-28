@@ -6,7 +6,7 @@
 // Pinout:
 // https://protosupplies.com/product/esp8266-witty-cloud-esp-12f-wifi-module/
 
-const auto NETWORK_NAME = "BOTEROS-NET";
+const auto NETWORK_NAME = "<ADD THE NAME OF YOUR SSID HERE>";
 const auto HOW_LONG_BEFORE_OPENING_GARAGE = 10 * 60 * 1000;  // 10 MINUTES
 
 // https://protosupplies.com/product/esp8266-witty-cloud-esp-12f-wifi-module/

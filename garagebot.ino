@@ -24,7 +24,7 @@ void setup() {
   last_time_seen = millis();
 }
 
-void openGarage(uint32_t durationMillis = 2000) {
+void openGarage(uint32_t durationMillis = 3000) {
   Serial.println(F("OPENING GARAGE"));
   analogWrite(RGB_G_PIN, 0);
   analogWrite(RGB_R_PIN, 255);
