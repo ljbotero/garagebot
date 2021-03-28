@@ -17,4 +17,9 @@ const auto RGB_G_PIN = 12;    // RGB Green LED
 const auto RGB_B_PIN = 13;    // RGB Blue LED
 const auto LDR_PIN = PIN_A0;  // Define the analog pin the LDR is connected to
 
+const auto MAX_LENGTH_SSID = 32;
+const auto STATE_INITIALIZED = 127;
+const auto SAMPLES = 100;
+const auto MIN_ROLLING_VARIANCE = 5;
+
 #endif

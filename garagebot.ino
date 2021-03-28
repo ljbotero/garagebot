@@ -1,3 +1,4 @@
+#include "fingerprints.h"
 #include "globals.h"
 #include "scan.h"
 #include "utils.h"
@@ -6,6 +7,7 @@ unsigned long last_time_seen = 0;
 auto is_scanning = false;
 uint16_t normalized_signal_strenght;
 auto learnFingerprint = false;
+Fingerprints::storageStruct fingerprints;
 
 void setup() {
   Serial.println(F("Setup"));
@@ -21,7 +23,7 @@ void setup() {
   analogWrite(RGB_G_PIN, 0);
   analogWrite(RGB_B_PIN, 0);
   digitalWrite(ON_BOARD_LED, HIGH);  // Off
-  loadFingerprints();
+  fingerprints = Fingerprints::load();
 
   last_time_seen = millis();
 }
@@ -72,8 +74,8 @@ void scan(int numberOfNetworks) {
   if (learnFingerprint) {
     wifiStruct *root = getOrderedWifiList(numberOfNetworks);
     printWifiList(root);
-    updateNetworks(root);
-    saveFingerprints();
+    Fingerprints::update(fingerprints, root);
+    Fingerprints::save(fingerprints);
     deleteWifiList(root);
     learnFingerprint = false;
   }
@@ -101,7 +103,7 @@ void loop() {
   auto btn_Status = digitalRead(BUTTON_PIN);
   if (btn_Status == LOW) {
     learnFingerprint = true;
-    //openGarage(500);
+    // openGarage(500);
   }
 
   if (!is_scanning) {
