@@ -6,14 +6,15 @@
 
 namespace Fingerprints {
 
-storageStruct &load() {
+storageStruct &load(uint8_t positionNumber) {
   storageStruct fingerprints;
   EEPROM.begin(sizeof(fingerprints));
-  EEPROM.get(0, fingerprints);
+  int address = positionNumber * sizeof(struct storageStruct);
+  EEPROM.get(address, fingerprints);
   if (fingerprints.state != STATE_INITIALIZED) {
     storageStruct newData;
     newData.state = STATE_INITIALIZED;
-    EEPROM.put(0, newData);
+    EEPROM.put(address, newData);
     EEPROM.commit();
     fingerprints = newData;
     Serial.println(F("EEPROM Initialized"));
@@ -21,21 +22,26 @@ storageStruct &load() {
   return fingerprints;
 }
 
-void save(storageStruct &fingerprints) {
-  EEPROM.put(0, fingerprints);
+void save(storageStruct &fingerprints, uint8_t positionNumber) {
+  int address = positionNumber * sizeof(struct storageStruct);
+  EEPROM.put(address, fingerprints);
   EEPROM.commit();
 }
 
-void print(networkDataStruct &fingerprint) {
-  Serial.print(F("Fingerprint: "));
-  Serial.print(fingerprint.SSID);
-  Serial.print(F(" ("));
-  Serial.print(fingerprint.rollingAverageRSSI);
-  Serial.print(F("db +-"));
-  Serial.print(fingerprint.rollingVarianceRSSI);
-  Serial.print(F(") seen "));
-  Serial.print(fingerprint.timesSeen);
-  Serial.println(F(" times"));
+void print(storageStruct &fingerprints) {
+  for (auto fingerprintNum = 0; fingerprintNum < MAX_NETWORKS;
+       fingerprintNum++) {
+    networkDataStruct &fingerprint = fingerprints.fingerprint[fingerprintNum];
+    Serial.print(F("Fingerprint: "));
+    Serial.print(fingerprint.SSID);
+    Serial.print(F(" ("));
+    Serial.print(fingerprint.rollingAverageRSSI);
+    Serial.print(F("db +-"));
+    Serial.print(fingerprint.rollingVarianceRSSI);
+    Serial.print(F(") seen "));
+    Serial.print(fingerprint.timesSeen);
+    Serial.println(F(" times"));
+  }
 }
 
 bool isSSIDInFingerprints(storageStruct &fingerprints, const String &ssid) {
@@ -49,6 +55,30 @@ bool isSSIDInFingerprints(storageStruct &fingerprints, const String &ssid) {
   return false;
 }
 
+float matchPercentage(storageStruct &fingerprints, wifiStruct *list) {
+  float possibleMatches = 0;
+  float matches = 0;
+  for (auto fingerprintNum = 0; fingerprintNum < MAX_NETWORKS;
+       fingerprintNum++) {
+    networkDataStruct &fingerprint = fingerprints.fingerprint[fingerprintNum];
+    if (strlen(fingerprint.SSID) > 0 &&
+        fingerprint.timesSeen >= MIN_TIMES_CAN_BE_SEEN) {
+      possibleMatches++;
+      wifiStruct *match = findSSIDInList(list, fingerprint.SSID);
+      if (match != nullptr) {
+        auto lowerLimit =
+            fingerprint.rollingAverageRSSI - fingerprint.rollingVarianceRSSI;
+        auto upperLimit =
+            fingerprint.rollingAverageRSSI + fingerprint.rollingVarianceRSSI;
+        if (match->RSSI >= lowerLimit && match->RSSI <= upperLimit) {
+          matches++;
+        }
+      }
+    }
+  }
+  return matches / possibleMatches;
+}
+
 void update(storageStruct &fingerprints, wifiStruct *list) {
   wifiStruct *currentList = list;
   for (auto fingerprintNum = 0; fingerprintNum < MAX_NETWORKS;
@@ -58,7 +88,7 @@ void update(storageStruct &fingerprints, wifiStruct *list) {
       wifiStruct *matchingList = findSSIDInList(list, fingerprint.SSID);
       if (matchingList == nullptr) {
         // Update times seen
-        if (fingerprint.timesSeen > MIN_TIMES_CAN_BE_SEEN) {
+        if (fingerprint.timesSeen > 0) {
           fingerprint.timesSeen--;
         }
       } else {
@@ -98,8 +128,7 @@ void update(storageStruct &fingerprints, wifiStruct *list) {
         currentList = currentList->next;
       }
     }
-    print(fingerprint);
   }
 }
 
-}
+}  // namespace Fingerprints

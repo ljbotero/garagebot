@@ -3,11 +3,15 @@
 #include "scan.h"
 #include "utils.h"
 
+const auto STORE_CURRENT_FINGP_FERQUENCY = 10;
+uint8_t counter_last_stored = 0;
+
 unsigned long last_time_seen = 0;
 auto is_scanning = false;
 uint16_t normalized_signal_strenght;
 auto learnFingerprint = false;
-Fingerprints::storageStruct fingerprints;
+Fingerprints::storageStruct openGarageFingerprint;
+Fingerprints::storageStruct currentFingerprint;
 
 void setup() {
   Serial.println(F("Setup"));
@@ -23,7 +27,8 @@ void setup() {
   analogWrite(RGB_G_PIN, 0);
   analogWrite(RGB_B_PIN, 0);
   digitalWrite(ON_BOARD_LED, HIGH);  // Off
-  fingerprints = Fingerprints::load();
+  openGarageFingerprint = Fingerprints::load();
+  currentFingerprint = Fingerprints::load(1);
 
   last_time_seen = millis();
 }
@@ -37,52 +42,58 @@ void openGarage(uint32_t durationMillis = 3000) {
 }
 
 void scan(int numberOfNetworks) {
-  Serial.print(F("Networks: "));
-  bool found = false;
-  for (int networkIndex = 0; networkIndex < numberOfNetworks; networkIndex++) {
-    String currentSSID = WiFi.SSID(networkIndex);
-    Serial.print(currentSSID);
-    Serial.print(F(" ,"));
+  // bool found = false;
+  // for (int networkIndex = 0; networkIndex < numberOfNetworks; networkIndex++) {
+  //   String currentSSID = WiFi.SSID(networkIndex);
 
-    if (currentSSID.equalsIgnoreCase(NETWORK_NAME)) {
-      auto signalStrength = WiFi.RSSI(networkIndex);
-      updateRSSIStats(signalStrength);
-      if (isRSSIOutsideNormal(signalStrength)) {
-        if (last_time_seen + HOW_LONG_BEFORE_OPENING_GARAGE < millis()) {
-          openGarage();
-        } else {
-          analogWrite(RGB_B_PIN, 255);
-          delay(200);
-          analogWrite(RGB_B_PIN, 0);
-        }
-      }
-      last_time_seen = millis();
-      auto mappedValue = map(signalStrength, -85, -35, 1, 255);
-      normalized_signal_strenght = constrain(mappedValue, 1, 255);
-      Serial.println(F(""));
-      Serial.print(F("Found network: "));
-      Serial.print(signalStrength);
-      Serial.print(F("db ("));
-      Serial.print(normalized_signal_strenght);
-      Serial.print(F(")"));
-      found = true;
-      break;
-    }
-  }
+  //   if (currentSSID.equalsIgnoreCase(NETWORK_NAME)) {
+  //     auto signalStrength = WiFi.RSSI(networkIndex);
+  //     updateRSSIStats(signalStrength);
+  //     if (isRSSIOutsideNormal(signalStrength)) {
+  //       if (last_time_seen + HOW_LONG_BEFORE_OPENING_GARAGE < millis()) {
+  //         openGarage();
+  //       } else {
+  //         analogWrite(RGB_B_PIN, 255);
+  //         delay(200);
+  //         analogWrite(RGB_B_PIN, 0);
+  //       }
+  //     }
+  //     last_time_seen = millis();
+  //     auto mappedValue = map(signalStrength, -85, -35, 1, 255);
+  //     normalized_signal_strenght = constrain(mappedValue, 1, 255);
+  //     found = true;
+  //     break;
+  //   }
+  // }
+
+  wifiStruct *justSeenNetworks = getOrderedWifiList(numberOfNetworks);
+  float match = Fingerprints::matchPercentage(openGarageFingerprint, justSeenNetworks);
+  Serial.print(F("Match open garage footprint: "));
+  Serial.print(match * 100, 2);
+  Serial.print(F("%"));
   Serial.println(F(""));
 
   if (learnFingerprint) {
-    wifiStruct *root = getOrderedWifiList(numberOfNetworks);
-    printWifiList(root);
-    Fingerprints::update(fingerprints, root);
-    Fingerprints::save(fingerprints);
-    deleteWifiList(root);
+    printWifiList(justSeenNetworks);
+    Fingerprints::update(openGarageFingerprint, justSeenNetworks);
+    Fingerprints::save(openGarageFingerprint);
     learnFingerprint = false;
+    Serial.println(F("***Learned Open Garage Fingerprint***"));
+    Fingerprints::print(openGarageFingerprint);
+  } else {
+    Fingerprints::update(currentFingerprint, justSeenNetworks);
+    Fingerprints::print(currentFingerprint);
+    if (counter_last_stored ++ >= STORE_CURRENT_FINGP_FERQUENCY) {
+      counter_last_stored = 0;
+      Fingerprints::save(currentFingerprint);
+    }
   }
+  deleteWifiList(justSeenNetworks);
+  Serial.println(F(""));
 
-  if (!found) {
-    normalized_signal_strenght = 0;
-  }
+  // if (!found) {
+  //   normalized_signal_strenght = 0;
+  // }
   is_scanning = false;
 }
 
