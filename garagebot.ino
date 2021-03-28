@@ -1,11 +1,11 @@
-#include <ESP8266WiFi.h>
-
 #include "globals.h"
+#include "scan.h"
 #include "utils.h"
 
 unsigned long last_time_seen = 0;
 auto is_scanning = false;
 uint16_t normalized_signal_strenght;
+auto learnFingerprint = false;
 
 void setup() {
   Serial.println(F("Setup"));
@@ -21,6 +21,8 @@ void setup() {
   analogWrite(RGB_G_PIN, 0);
   analogWrite(RGB_B_PIN, 0);
   digitalWrite(ON_BOARD_LED, HIGH);  // Off
+  loadFingerprints();
+
   last_time_seen = millis();
 }
 
@@ -39,6 +41,7 @@ void scan(int numberOfNetworks) {
     String currentSSID = WiFi.SSID(networkIndex);
     Serial.print(currentSSID);
     Serial.print(F(" ,"));
+
     if (currentSSID.equalsIgnoreCase(NETWORK_NAME)) {
       auto signalStrength = WiFi.RSSI(networkIndex);
       updateRSSIStats(signalStrength);
@@ -50,9 +53,8 @@ void scan(int numberOfNetworks) {
           delay(200);
           analogWrite(RGB_B_PIN, 0);
         }
-      } else {
-        last_time_seen = millis();
       }
+      last_time_seen = millis();
       auto mappedValue = map(signalStrength, -85, -35, 1, 255);
       normalized_signal_strenght = constrain(mappedValue, 1, 255);
       Serial.println(F(""));
@@ -60,11 +62,22 @@ void scan(int numberOfNetworks) {
       Serial.print(signalStrength);
       Serial.print(F("db ("));
       Serial.print(normalized_signal_strenght);
-      Serial.println(F(")"));
+      Serial.print(F(")"));
       found = true;
       break;
     }
   }
+  Serial.println(F(""));
+
+  if (learnFingerprint) {
+    wifiStruct *root = getOrderedWifiList(numberOfNetworks);
+    printWifiList(root);
+    updateNetworks(root);
+    saveFingerprints();
+    deleteWifiList(root);
+    learnFingerprint = false;
+  }
+
   if (!found) {
     normalized_signal_strenght = 0;
   }
@@ -76,7 +89,7 @@ void blink() {
     if (last_time_seen + HOW_LONG_BEFORE_OPENING_GARAGE < millis()) {
       blinkLight(RGB_B_PIN, 200);  // Blink blue when ready to trigger
     } else {
-      blinkLight(RGB_R_PIN, 200);  // Blink red when un-engaged
+      blinkLight(RGB_B_PIN, 400);  // Blink slow blue when un-engaged
     }
   } else {
     auto blinkDelay = map(normalized_signal_strenght, 1, 255, 2000, 100);
@@ -87,7 +100,8 @@ void blink() {
 void loop() {
   auto btn_Status = digitalRead(BUTTON_PIN);
   if (btn_Status == LOW) {
-    openGarage(500);
+    learnFingerprint = true;
+    //openGarage(500);
   }
 
   if (!is_scanning) {

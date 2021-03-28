@@ -1,10 +1,10 @@
+#include "utils.h"
+
 #include "globals.h"
 
 unsigned long wait_until_millis;
 int continue_step_number = 0;
 
-const auto SAMPLES = 100;
-const auto MIN_ROLLING_VARIANCE = 5;
 float rollingAverageRSSI = 0;
 float rollingVarianceRSSI = 0;
 
